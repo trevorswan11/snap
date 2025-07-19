@@ -4,8 +4,8 @@ use std::ops::{Index, IndexMut};
 /// A generic matrix type
 #[derive(Clone)]
 pub struct Matrix<T> {
-    width: usize,
-    height: usize,
+    pub width: usize,
+    pub height: usize,
     datum: Vec<T>,
 }
 
@@ -38,13 +38,13 @@ where
     pub fn from_vec(width: usize, height: usize, data: Vec<T>) -> Option<Self> {
         if data.len() != width * height {
             return None;
+        } else {
+            Some(Self {
+                width,
+                height,
+                datum: data,
+            })
         }
-        
-        Some(Self {
-            width,
-            height,
-            datum: data,
-        })
     }
 
     /// Less idiomatic way to get a reference to a stored value. Use Index Trait
@@ -70,16 +70,16 @@ where
 
     /// Sets each element on the border of the Matrix to the given value
     pub fn fill_border(&mut self, value: T) {
-        let (w, h) = (self.width, self.height);
+        let (width, height) = (self.width, self.height);
 
-        for col in 0..w {
+        for col in 0..width {
             self[(0, col)] = value.clone();
-            self[(h - 1, col)] = value.clone();
+            self[(height - 1, col)] = value.clone();
         }
 
-        for row in 0..h {
+        for row in 0..height {
             self[(row, 0)] = value.clone();
-            self[(row, w - 1)] = value.clone();
+            self[(row, width - 1)] = value.clone();
         }
     }
 
@@ -93,24 +93,21 @@ where
         self.datum.iter().copied().max()
     }
 
-    /**
-     * Returns a pair of the minimal value in and the column where the element
-     * with the minimal value in a particular row is located
-     * */
-    pub fn min_in_row(&self, row: usize) -> Option<(T, usize)> {
+    /// Returns a pair of the minimal value in and the column where the element
+    /// with the minimal value in a particular row is located. Fmt: (index, val)
+    pub fn min_in_row(&self, row: usize) -> Option<(usize, T)> {
         self.min_in_row_range(row, 0, self.width)
     }
 
-    /**
-     * Returns a pair of the minimal value in and the column where the element
-     * with the minimal value in a particular region in a given row is located
-     * */
+    /// Returns a pair of the minimal value in and the column where the element
+    /// with the minimal value in a particular region in a given row is located.
+    /// Fmt: (index, val)
     pub fn min_in_row_range(
         &self,
         row: usize,
         column_start: usize,
         column_end: usize,
-    ) -> Option<(T, usize)> {
+    ) -> Option<(usize, T)> {
         if row >= self.height || column_start >= column_end || column_end > self.width {
             return None;
         }
@@ -126,7 +123,23 @@ where
             }
         }
 
-        Some((min_val, min_index))
+        Some((min_index, min_val))
+    }
+
+    /// Truncates the matrix to the new width. Asserts that the matrix will shrink
+    pub fn trim_width(&mut self, new_width: usize) {
+        assert!(new_width <= self.width);
+
+        let mut new_datum = Vec::with_capacity(self.height * new_width);
+
+        for row in 0..self.height {
+            let start = row * self.width;
+            let end = start + new_width;
+            new_datum.extend_from_slice(&self.datum[start..end]);
+        }
+
+        self.datum = new_datum;
+        self.width = new_width;
     }
 }
 
