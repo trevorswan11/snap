@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fs::File;
-use std::io::{self, BufRead, BufWriter, Write};
+use std::io::{self, BufRead, BufWriter, Cursor, Read, Write};
 
 use crate::seam::matrix::*;
 
@@ -12,6 +12,13 @@ pub struct PixelRGB {
     pub b: usize,
 }
 
+/// Represents the two common types of PPM files
+#[derive(Debug)]
+pub enum PPMFormat {
+    P3,
+    P6,
+}
+
 /// Representation of a 2D RGB image
 #[derive(Debug)]
 pub struct Image {
@@ -21,11 +28,12 @@ pub struct Image {
     red_channel: Matrix<usize>,
     blue_channel: Matrix<usize>,
     green_channel: Matrix<usize>,
+    format: PPMFormat,
 }
 
 impl Image {
     /// Initializes an Image with the given width, height, and intensity with all channels set to 0
-    pub fn new(width: usize, height: usize, intensity: usize) -> Image {
+    pub fn new(width: usize, height: usize, intensity: usize, format: PPMFormat) -> Image {
         Image {
             width: width,
             height: height,
@@ -33,22 +41,42 @@ impl Image {
             red_channel: Matrix::new_filled(width, height, 0),
             blue_channel: Matrix::new_filled(width, height, 0),
             green_channel: Matrix::new_filled(width, height, 0),
+            format: format,
         }
     }
 
-    /// Initializes an Image from a valid PPM
-    pub fn from_ppm(filepath: &str) -> Result<Image, Box<dyn Error>> {
-        let f = File::open(filepath)?;
-        let reader = io::BufReader::new(f);
-        let mut lines = reader.lines();
+    /// Initializes an Image from a valid PPM file
+    pub fn from_file(filepath: &str) -> Result<Image, Box<dyn Error>> {
+        let mut file = File::open(filepath)?;
+        Self::from_reader(&mut file)
+    }
 
-        // Verify the 'P3' header
-        let magic = lines.next().ok_or("Missing PPM header")??;
-        if magic.trim().to_uppercase() != "P3" {
-            return Err("Invalid PPM format header".into());
+    /// Initializes an Image from the bytes of a PPM file
+    pub fn from_bytes(data: &[u8]) -> Result<Image, Box<dyn Error>> {
+        let mut cursor = Cursor::new(data);
+        Self::from_reader(&mut cursor)
+    }
+
+    fn from_reader<R: Read>(reader: &mut R) -> Result<Image, Box<dyn Error>> {
+        let mut header = [0; 2];
+        reader.read_exact(&mut header)?;
+
+        match &header {
+            b"P3" => {
+                let buf = io::BufReader::new(reader);
+                Self::parse_ppm_ascii(buf.lines())
+            }
+            b"P6" => Self::parse_ppm_binary(reader),
+            _ => Err("Unsupported PPM format".into()),
         }
+    }
 
-        // Get dims, but skip any present comments
+    fn parse_ppm_ascii<I>(mut lines: I) -> Result<Image, Box<dyn Error>>
+    where
+        I: Iterator<Item = Result<String, io::Error>>,
+    {
+        let _magic = lines.next().ok_or("Missing PPM header")??;
+
         let mut dimensions_line = String::new();
         for line in &mut lines {
             let l = line?;
@@ -58,14 +86,12 @@ impl Image {
             }
         }
 
-        // Unpack the dimensions
         let mut dims = dimensions_line
             .split_whitespace()
             .map(|s| s.parse::<usize>());
         let width = dims.next().ok_or("Missing width dimension")??;
         let height = dims.next().ok_or("Missing height dimension")??;
 
-        // Get the max intensity value, skipping comments
         let mut intensity_line = String::new();
         for line in &mut lines {
             let l = line?;
@@ -75,10 +101,8 @@ impl Image {
             }
         }
 
-        // Unpack the intensity
         let intensity = intensity_line.trim().parse::<usize>()?;
 
-        // Read the pixels
         let pixel_values = lines
             .flat_map(|line| {
                 line.ok()
@@ -92,7 +116,6 @@ impl Image {
             return Err("Incorrect number of pixel values".into());
         }
 
-        // Chunk the pixels and pack into rgb vec
         let mut red_pixels = Vec::with_capacity(width * height);
         let mut blue_pixels = Vec::with_capacity(width * height);
         let mut green_pixels = Vec::with_capacity(width * height);
@@ -112,30 +135,125 @@ impl Image {
                 .expect("Invalid green channel values"),
             blue_channel: Matrix::from_vec(width, height, blue_pixels)
                 .expect("Invalid blue channel values"),
+            format: PPMFormat::P3,
         })
     }
 
+    fn parse_ppm_binary<R: io::Read>(reader: &mut R) -> Result<Image, Box<dyn Error>> {
+        let mut buf_reader = io::BufReader::new(reader);
+
+        let mut header = String::new();
+        buf_reader.read_line(&mut header)?;
+
+        let dimensions = loop {
+            let mut line = String::new();
+            buf_reader.read_line(&mut line)?;
+            if !line.trim().starts_with('#') {
+                let mut parts = line.split_whitespace();
+                let w = parts.next().ok_or("Missing width")?.parse::<usize>()?;
+                let h = parts.next().ok_or("Missing height")?.parse::<usize>()?;
+                break (w, h);
+            }
+        };
+
+        let (width, height) = dimensions;
+
+        let intensity = loop {
+            let mut line = String::new();
+            buf_reader.read_line(&mut line)?;
+            if !line.trim().starts_with('#') {
+                break line.trim().parse::<usize>()?;
+            }
+        };
+
+        let mut raw = Vec::new();
+        buf_reader.read_to_end(&mut raw)?;
+
+        if raw.len() != width * height * 3 {
+            return Err("Binary pixel data length mismatch".into());
+        }
+
+        let mut red = Vec::with_capacity(width * height);
+        let mut green = Vec::with_capacity(width * height);
+        let mut blue = Vec::with_capacity(width * height);
+
+        for chunk in raw.chunks_exact(3) {
+            red.push(chunk[0] as usize);
+            green.push(chunk[1] as usize);
+            blue.push(chunk[2] as usize);
+        }
+
+        Ok(Image {
+            width,
+            height,
+            max_intensity: intensity,
+            red_channel: Matrix::from_vec(width, height, red)
+                .ok_or("Invalid red channel values")?,
+            green_channel: Matrix::from_vec(width, height, green)
+                .ok_or("Invalid green channel values")?,
+            blue_channel: Matrix::from_vec(width, height, blue)
+                .ok_or("Invalid blue channel values")?,
+            format: PPMFormat::P6,
+        })
+    }
+
+    /// Creates a file and writes the images data to it in valid PPM format
     pub fn write_ppm_file(&self, filepath: &str) -> Result<(), Box<dyn Error>> {
         let file = File::create(filepath)?;
         let mut writer = BufWriter::new(file);
 
-        // Write PPM header
+        match self.format {
+            PPMFormat::P3 => self.write_ascii(&mut writer),
+            PPMFormat::P6 => self.write_binary(&mut writer),
+        }
+    }
+
+    /// Writes the Image's data to the given writer in valid ppm format
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), Box<dyn Error>> {
+        match self.format {
+            PPMFormat::P3 => self.write_ascii(writer),
+            PPMFormat::P6 => self.write_binary(writer),
+        }
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut buffer = Vec::new();
+        match self.format {
+            PPMFormat::P3 => self.write_ascii(&mut buffer)?,
+            PPMFormat::P6 => self.write_binary(&mut buffer)?,
+        };
+        Ok(buffer)
+    }
+
+    fn write_ascii<W: Write>(&self, writer: &mut W) -> Result<(), Box<dyn Error>> {
         writeln!(writer, "P3")?;
         writeln!(writer, "{} {}", self.width, self.height)?;
         writeln!(writer, "{}", self.max_intensity)?;
 
-        // Write pixel data: one row per line
         for row in 0..self.height {
             for col in 0..self.width {
                 let pixel = self.get_pixel(row, col).unwrap();
                 write!(writer, "{} {} {}", pixel.r, pixel.g, pixel.b)?;
                 if col < self.width - 1 {
-                    write!(writer, " ")?; // space between pixels
+                    write!(writer, " ")?;
                 }
             }
-            writeln!(writer)?; // newline after each row
+            writeln!(writer)?;
         }
+        Ok(())
+    }
 
+    fn write_binary<W: Write>(&self, writer: &mut W) -> Result<(), Box<dyn Error>> {
+        writeln!(writer, "P6")?;
+        writeln!(writer, "{} {}", self.width, self.height)?;
+        writeln!(writer, "{}", self.max_intensity)?;
+
+        for row in 0..self.height {
+            for col in 0..self.width {
+                let pixel = self.get_pixel(row, col).unwrap();
+                writer.write_all(&[pixel.r as u8, pixel.g as u8, pixel.b as u8])?;
+            }
+        }
         Ok(())
     }
 
@@ -252,7 +370,7 @@ impl Image {
                 }
             }
         }
-        
+
         if max_energy == 0 {
             max_energy = 1;
         }
@@ -266,12 +384,10 @@ impl Image {
         let energy = self.energy();
         let mut cost = Matrix::new_filled(self.width, self.height, 0);
 
-        // The first row is just the energy values
         for col in 0..self.width {
             cost[(0, col)] = energy[(0, col)];
         }
 
-        // Iteratively fill in the rest of the cost matrix
         for row in 1..self.height {
             for col in 0..self.width {
                 let mut min_prev = cost[(row - 1, col)];
@@ -289,18 +405,11 @@ impl Image {
         cost
     }
 
-    /// Returns the vertical seam with the minimal cost according to the given
-    /// cost matrix, represented as a vector filled with the column numbers for
-    /// each pixel along the seam, starting with the lowest numbered row (top
-    /// of image) and progressing to the highest (bottom of image). The length
-    /// of the returned vector is equal to the height of the cost matrix.
-    /// While determining the seam, if any pixels tie for lowest cost, the
-    /// leftmost one (i.e. with the lowest column number) is used.
+    /// Returns the vertical seam with the minimal cost
     pub fn minimal_vertical_seam(&self) -> Vec<usize> {
         let cost = self.vertical_cost();
         let mut seam = vec![0; self.height];
 
-        // Start at the minimum in the bottom row
         let mut current_col = cost
             .min_in_row_range(self.height - 1, 0, self.width)
             .expect("Bottom row should not be empty")
@@ -323,10 +432,7 @@ impl Image {
         seam
     }
 
-    /// Removes the given vertical seam from the Image. That is, one
-    /// pixel will be removed from every row in the image. The pixel
-    /// removed from row r will be the one with column equal to seam[r].
-    /// The width of the image will be one less than before.
+    /// Removes the minimal vertical seam from the image
     pub fn remove_vertical_seam(&mut self) {
         let seam = self.minimal_vertical_seam();
         assert_eq!(seam.len(), self.height, "Seam must have one entry per row");
