@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::fmt;
 use std::ops::{Index, IndexMut};
 
@@ -8,14 +6,13 @@ use std::ops::{Index, IndexMut};
 pub struct Matrix<T> {
     pub width: usize,
     pub height: usize,
-    datum: Vec<T>,
+    pub datum: Vec<T>,
 }
 
 impl<T> Matrix<T>
 where
     T: Copy + Clone + Ord,
 {
-    /// Creates an empty matrix with specified width and height
     pub fn new(width: usize, height: usize) -> Matrix<T>
     where
         T: Default,
@@ -65,12 +62,10 @@ where
         }
     }
 
-    /// Sets each element of the Matrix to the given value
     pub fn fill(&mut self, value: T) {
         self.datum.fill(value);
     }
 
-    /// Sets each element on the border of the Matrix to the given value
     pub fn fill_border(&mut self, value: T) {
         let (width, height) = (self.width, self.height);
 
@@ -85,25 +80,20 @@ where
         }
     }
 
-    /// Returns the minimum value in the matrix
     pub fn min(&self) -> Option<T> {
         self.datum.iter().copied().min()
     }
 
-    /// Returns the maximum value in the matrix
     pub fn max(&self) -> Option<T> {
         self.datum.iter().copied().max()
     }
 
-    /// Returns a pair of the minimal value in and the column where the element
-    /// with the minimal value in a particular row is located. Fmt: (index, val)
+    /// Returns minimum in row as: (index, val)
     pub fn min_in_row(&self, row: usize) -> Option<(usize, T)> {
         self.min_in_row_range(row, 0, self.width)
     }
 
-    /// Returns a pair of the minimal value in and the column where the element
-    /// with the minimal value in a particular region in a given row is located.
-    /// Fmt: (index, val)
+    /// Returns minimum in row's range as: (index, val)
     pub fn min_in_row_range(
         &self,
         row: usize,
@@ -128,16 +118,16 @@ where
         Some((min_index, min_val))
     }
 
-    /// Truncates the matrix to the new width. Asserts that the matrix will shrink
     pub fn trim_width(&mut self, new_width: usize) {
         assert!(new_width <= self.width);
 
         let mut new_datum = Vec::with_capacity(self.height * new_width);
 
         for row in 0..self.height {
-            let start = row * self.width;
-            let end = start + new_width;
-            new_datum.extend_from_slice(&self.datum[start..end]);
+            let old_row_start = row * self.width;
+            let old_row_end = old_row_start + self.width;
+            let row_slice = &self.datum[old_row_start..old_row_end];
+            new_datum.extend_from_slice(&row_slice[..new_width]);
         }
 
         self.datum = new_datum;
