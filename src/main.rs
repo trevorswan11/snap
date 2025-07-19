@@ -1,5 +1,6 @@
 mod seam {
     pub mod matrix;
+    pub mod image;
 }
 
 fn main() {
