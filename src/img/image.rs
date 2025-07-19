@@ -5,8 +5,8 @@ use crate::img::scale::ScaleMethod;
 use crate::img::utils::PixelRGB;
 
 use std::error::Error;
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 /// Representation of a 2D RGB image
 #[derive(Debug)]

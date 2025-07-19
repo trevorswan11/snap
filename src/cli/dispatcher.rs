@@ -1,6 +1,6 @@
 use crate::cli::commands::*;
 use crate::img::image::Image;
-use crate::img::io::convert;
+use crate::img::io::{convert, info};
 
 use clap::Parser;
 
@@ -9,6 +9,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         TopLevelCommand::Img(img_cmd) => match img_cmd {
+            ImgCommand::Info { filepath_in } => {
+                info(&filepath_in)?;
+            }
             ImgCommand::Resize {
                 filepath_in,
                 filepath_out,

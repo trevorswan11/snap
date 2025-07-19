@@ -3,6 +3,7 @@ use crate::img::matrix::*;
 
 use image::{ImageFormat, ImageReader, load_from_memory};
 use std::error::Error;
+use std::fmt;
 use std::fs::File;
 use std::io::{self, BufRead, BufWriter, Cursor, Read, Write};
 use std::path::Path;
@@ -12,6 +13,15 @@ use std::path::Path;
 pub enum PPMFormat {
     P3,
     P6,
+}
+
+impl fmt::Display for PPMFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::P3 => write!(f, "P3"),
+            Self::P6 => write!(f, "P6"),
+        }
+    }
 }
 
 /// Infers the image type from a given file path and maps it to ImageFormat
@@ -105,6 +115,34 @@ pub fn convert(input_path: &str, output_path: &str) -> Result<(), Box<dyn Error>
         img.save_with_format(output_path, output_format)?;
     }
 
+    Ok(())
+}
+
+pub fn info(input_path: &str) -> Result<(), Box<dyn Error>> {
+    if Path::new(input_path)
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|ext| ext.eq_ignore_ascii_case("ppm"))
+        .unwrap_or(false)
+    {
+        let img = Image::from_file(input_path)?;
+        print!("PPM - {} Format:", img.format);
+        println!("  Width = {}", img.width);
+        println!("  Height = {}", img.height);
+        println!("  Max Intensity = {}", img.max_intensity);
+    } else {
+        let path = Path::new(input_path);
+        let reader = ImageReader::open(&path)?.with_guessed_format()?;
+        if let Some(format) = reader.format() {
+            let img_fmt_src = format!("{:?}", format).to_uppercase();
+            println!("{} Format:", img_fmt_src);
+            let img = reader.decode()?;
+            println!("  Width = {}", img.width());
+            println!("  Height = {}", img.height());
+        } else {
+            println!("Could not determine image format");
+        }
+    }
     Ok(())
 }
 

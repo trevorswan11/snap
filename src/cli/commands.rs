@@ -23,6 +23,9 @@ pub enum TopLevelCommand {
 
 #[derive(Subcommand)]
 pub enum ImgCommand {
+    #[command(about = "Gets pertinent information about the input image")]
+    Info { filepath_in: String },
+
     #[command(about = "Resizes the image to the new height and width")]
     Resize {
         filepath_in: String,
