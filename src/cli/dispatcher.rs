@@ -10,7 +10,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         TopLevelCommand::Img(img_cmd) => match img_cmd {
             ImgCommand::Info { filepath_in } => {
-                info(&filepath_in)?;
+                _ = info(&filepath_in, true)?;
             }
             ImgCommand::Resize {
                 filepath_in,

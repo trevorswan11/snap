@@ -77,8 +77,8 @@ pub fn to_ppm(img_path: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     let path = Path::new(img_path);
 
     if path.extension().map(|s| s == "ppm").unwrap_or(false) {
-        let image = Image::from_file(img_path)?;
-        image.bytes_format(PPMFormat::P6)
+        let bytes = std::fs::read(img_path)?;
+        return Ok(bytes);
     } else {
         let img = image::open(img_path)?.to_rgb8();
         let (width, height) = img.dimensions();
@@ -118,8 +118,21 @@ pub fn convert(input_path: &str, output_path: &str) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
+/// Container for sharing pertinent image information
+#[derive(Debug, Clone, Default)]
+pub struct ImageInfo {
+    pub width: usize,
+    pub height: usize,
+    pub format_str: String,
+    pub path: String,
+    pub intensity: Option<usize>,
+}
+
 /// Returns the image's pertinent information
-pub fn info(input_path: &str) -> Result<(), Box<dyn Error>> {
+pub fn info(input_path: &str, print: bool) -> Result<ImageInfo, Box<dyn Error>> {
+    let mut info = ImageInfo::default();
+    info.path = input_path.to_string();
+
     if Path::new(input_path)
         .extension()
         .and_then(|s| s.to_str())
@@ -127,24 +140,45 @@ pub fn info(input_path: &str) -> Result<(), Box<dyn Error>> {
         .unwrap_or(false)
     {
         let img = Image::from_file(input_path)?;
-        print!("PPM - {} Format:", img.format);
-        println!("  Width = {}", img.width);
-        println!("  Height = {}", img.height);
-        println!("  Max Intensity = {}", img.max_intensity);
+
+        // printing (optional)
+        if print {
+            print!("PPM - {} Format:", img.format);
+            println!("  Width = {}", img.width);
+            println!("  Height = {}", img.height);
+            println!("  Max Intensity = {}", img.max_intensity);
+        }
+
+        // return assignment
+        info.width = img.width;
+        info.height = img.height;
+        info.format_str = format!("PPM - {}", img.format);
+        info.intensity = Some(img.max_intensity);
     } else {
         let path = Path::new(input_path);
         let reader = ImageReader::open(&path)?.with_guessed_format()?;
         if let Some(format) = reader.format() {
-            let img_fmt_src = format!("{:?}", format).to_uppercase();
-            println!("{} Format:", img_fmt_src);
             let img = reader.decode()?;
-            println!("  Width = {}", img.width());
-            println!("  Height = {}", img.height());
+            let img_fmt_str = format!("{:?}", format).to_uppercase();
+            
+            // printing (optional)
+            if print {
+                println!("{} Format:", img_fmt_str);
+                println!("  Width = {}", img.width());
+                println!("  Height = {}", img.height());
+            }
+
+            // return assignment
+            info.width = img.width() as usize;
+            info.height = img.height() as usize;
+            info.format_str = img_fmt_str;
+            info.intensity = None;
         } else {
-            println!("Could not determine image format");
+            return Err("Could not determine image format".into());
         }
     }
-    Ok(())
+
+    Ok(info)
 }
 
 impl Image {
