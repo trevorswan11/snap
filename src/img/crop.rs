@@ -21,7 +21,7 @@ pub enum CropMethod {
     RightTop,
     RightBottom,
 
-    Rectangular,
+    Rectangular
 }
 
 impl Image {

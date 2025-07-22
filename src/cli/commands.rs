@@ -60,6 +60,10 @@ pub enum ImgCommand {
         new_height: usize,
         #[arg(long, required = false)]
         method: Option<CropMethod>,
+        #[arg(long, required = false)]
+        center_x: Option<usize>,
+        #[arg(long, required = false)]
+        center_y: Option<usize>,
     },
 
     #[command(
@@ -90,6 +94,54 @@ pub enum ImgCommand {
         filepath_in: String,
         filepath_out: String,
         degrees: f64,
+    },
+
+    #[command(
+        about = "Rotates the image 90 degrees left",
+    )]
+    RotateLeft {
+        filepath_in: String,
+        filepath_out: String,
+    },
+
+    #[command(
+        about = "Rotates the image 90 degrees right",
+    )]
+    RotateRight {
+        filepath_in: String,
+        filepath_out: String,
+    },
+
+    #[command(
+        about = "Rotates the image 180 degrees",
+    )]
+    Flip {
+        filepath_in: String,
+        filepath_out: String,
+    },
+
+    #[command(
+        about = "Mirrors the image about the horizontal axis",
+    )]
+    MirrorX {
+        filepath_in: String,
+        filepath_out: String,
+    },
+
+    #[command(
+        about = "Mirrors the image about the vertical axis",
+    )]
+    MirrorY {
+        filepath_in: String,
+        filepath_out: String,
+    },
+
+    #[command(
+        about = "Transposes the image's underlying matrices",
+    )]
+    Transpose {
+        filepath_in: String,
+        filepath_out: String,
     },
 
     #[command(

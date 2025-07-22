@@ -118,6 +118,7 @@ pub fn convert(input_path: &str, output_path: &str) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
+/// Returns the image's pertinent information
 pub fn info(input_path: &str) -> Result<(), Box<dyn Error>> {
     if Path::new(input_path)
         .extension()

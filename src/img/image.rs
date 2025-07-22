@@ -70,7 +70,7 @@ impl Image {
     }
 
     /// Crops the image using the given cropping method
-    pub fn crop(&mut self, new_width: usize, new_height: usize, method: CropMethod) {
+    pub fn crop(&mut self, new_width: usize, new_height: usize, method: CropMethod, rect_center_x: Option<usize>, rect_center_y: Option<usize>) {
         if new_width == 0 || new_height == 0 || new_width > self.width || new_height > self.height {
             return;
         }
@@ -123,8 +123,8 @@ impl Image {
             }
 
             CropMethod::Rectangular => {
-                let x_offset = (self.width - new_width) / 2;
-                let y_offset = (self.height - new_height) / 2;
+                let x_offset = rect_center_x.unwrap_or((self.width - new_width) / 2);
+                let y_offset = rect_center_y.unwrap_or((self.height - new_height) / 2);
 
                 self.crop_rect(new_width, new_height, x_offset, y_offset);
             }
@@ -180,6 +180,28 @@ impl Image {
             }
         }
         Ok(())
+    }
+
+    /// Mirrors the images pixel maps about the horizontal axis
+    pub fn mirror_x(&mut self) {
+        self.red_channel.mirror_x();
+        self.green_channel.mirror_x();
+        self.blue_channel.mirror_x();
+    }
+
+    /// Mirrors the images pixel maps about the vertical axis
+    pub fn mirror_y(&mut self) {
+        self.red_channel.mirror_y();
+        self.green_channel.mirror_y();
+        self.blue_channel.mirror_y();
+    }
+
+    /// Transposes the image
+    pub fn transpose(&mut self) {
+        self.red_channel.transpose();
+        self.green_channel.transpose();
+        self.blue_channel.transpose();
+        std::mem::swap(&mut self.width, &mut self.height);
     }
 
     /// Saves the image to a file with the filetype inferred from the output path

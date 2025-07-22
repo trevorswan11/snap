@@ -46,12 +46,16 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 new_width,
                 new_height,
                 method,
+                center_x,
+                center_y,
             } => {
                 let mut i = Image::from_file(&filepath_in)?;
                 i.crop(
                     new_width,
                     new_height,
                     method.unwrap_or(crate::img::crop::CropMethod::Rectangular),
+                    center_x,
+                    center_y,
                 );
                 i.save(&filepath_out)?;
             }
@@ -83,6 +87,46 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             } => {
                 let mut i = Image::from_file(&filepath_in)?;
                 i.hue_shift(degrees)?;
+                i.save(&filepath_out)?;
+            }
+            ImgCommand::RotateLeft {
+                filepath_in,
+                filepath_out,
+            } => {
+                let mut i = Image::from_file(&filepath_in)?;
+                i.rotate_left();
+                i.save(&filepath_out)?;
+            }
+            ImgCommand::RotateRight {
+                filepath_in,
+                filepath_out,
+            } => {
+                let mut i = Image::from_file(&filepath_in)?;
+                i.rotate_right();
+                i.save(&filepath_out)?;
+            }
+            ImgCommand::Flip {
+                filepath_in,
+                filepath_out,
+            } => {
+                let mut i = Image::from_file(&filepath_in)?;
+                i.rotate_left();
+                i.rotate_left();
+                i.save(&filepath_out)?;
+            }
+            ImgCommand::MirrorX { filepath_in, filepath_out } => {
+                let mut i = Image::from_file(&filepath_in)?;
+                i.mirror_x();
+                i.save(&filepath_out)?;
+            }
+            ImgCommand::MirrorY { filepath_in, filepath_out } => {
+                let mut i = Image::from_file(&filepath_in)?;
+                i.mirror_y();
+                i.save(&filepath_out)?;
+            }
+            ImgCommand::Transpose { filepath_in, filepath_out } => {
+                let mut i = Image::from_file(&filepath_in)?;
+                i.transpose();
                 i.save(&filepath_out)?;
             }
             ImgCommand::Convert {

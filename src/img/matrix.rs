@@ -133,6 +133,38 @@ where
         self.datum = new_datum;
         self.width = new_width;
     }
+
+    pub fn transpose(&mut self) {
+        let mut new_data = vec![self.datum[0]; self.width * self.height];
+        for row in 0..self.height {
+            for col in 0..self.width {
+                new_data[col * self.height + row] = self[(row, col)];
+            }
+        }
+        std::mem::swap(&mut self.width, &mut self.height);
+        self.datum = new_data;
+    }
+
+    pub fn mirror_y(&mut self) {
+        for row in 0..self.height {
+            for col in 0..self.width / 2 {
+                self.datum.swap(
+                    row * self.width + col,
+                    row * self.width + (self.width - 1 - col),
+                );
+            }
+        }
+    }
+
+    pub fn mirror_x(&mut self) {
+        for col in 0..self.width {
+            for row in 0..self.height / 2 {
+                let top = row * self.width + col;
+                let bottom = (self.height - 1 - row) * self.width + col;
+                self.datum.swap(top, bottom);
+            }
+        }
+    }
 }
 
 impl<T> Index<(usize, usize)> for Matrix<T> {
